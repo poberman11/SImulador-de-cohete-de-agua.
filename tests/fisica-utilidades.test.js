@@ -22,7 +22,14 @@ describe('fisica.utilidades', () => {
     const deltaP = fisica.psiAPascales(10);
     const v = fisica.velocidadJet(deltaP);
     expect(v).toBeGreaterThan(0);
-    expect(v).toBeCloseTo(Math.sqrt(2 * deltaP / fisica.RHO_AGUA), 6);
+    expect(v).toBeCloseTo(Math.sqrt(2 * deltaP / 1000), 6);
+  });
+
+  it('velocidad jet no devuelve NaN para presión negativa (radicand clamp)', () => {
+    const v = fisica.velocidadJet(-1000);
+    expect(v).toBe(0);
+    const v2 = fisica.velocidadJet(0);
+    expect(v2).toBe(0);
   });
 
   it('empuje devuelve fuerza y caudal masico positivos con agua', () => {
