@@ -1,0 +1,20 @@
+/* Reset básico */
+html, body, h1, p, header, main, footer {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+html {
+  box-sizing: border-box;
+}
+
+body {
+  box-sizing: inherit;
+  font-family: sans-serif;
+  line-height: 1.5;
+}
+
+header, main, footer {
+  padding: 1rem;
+}

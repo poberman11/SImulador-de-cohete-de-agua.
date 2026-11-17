@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Test de scaffold - Simulador de Proyectil de Agua</title>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <!-- Test de carga de app.js -->
+  </main>
+  <script>
+    // Abrir este archivo en el navegador y abrir DevTools: no debe haber errores en consola
+    window.addEventListener('DOMContentLoaded', () => {
+      const hasApp = typeof window.appNamespace !== 'undefined' || document.querySelector('script[src="app.js"]');
+      console.assert(hasApp, 'app.js debe estar referenciado');
+    });
+  </script>
+</body>
+</html>
