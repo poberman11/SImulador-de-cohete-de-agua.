@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tests - fisica.utilidades</title>
+</head>
+<body>
+  <main>
+    <h1>Tests de fisica.utilidades</h1>
+    <pre id="out">Ejecutando… consulte la consola del navegador.</pre>
+  </main>
+  <!-- app.js primero (define window.appNamespace.fisica y el alias window.fisica) -->
+  <script src="../app.js" defer></script>
+  <script type="module" src="test-runner.js"></script>
+  <script type="module" src="fisica-utilidades.test.js"></script>
+  <script type="module">
+    import { summary } from './test-runner.js';
+    const s = summary();
+    const out = document.getElementById('out');
+    out.textContent = `PASSED: ${s.passes} / FAILED: ${s.failures}\n\n${s.details.map(d => (d.ok ? '✓' : '✗') + ' ' + d.name + (d.ok ? '' : ' — ' + d.error)).join('\n')}`;
+    if (s.failures === 0) {
+      out.style.color = 'green';
+    } else {
+      out.style.color = 'red';
+    }
+  </script>
+</body>
+</html>
