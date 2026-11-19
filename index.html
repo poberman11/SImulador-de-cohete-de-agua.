@@ -37,6 +37,38 @@
       </div>
     </form>
     <div id="resultado" class="resultado" aria-live="polite"></div>
+
+    <section id="visualizacion" aria-label="Visualización del lanzamiento">
+      <div id="estado-vacio" class="estado-vacio">Complete los datos y lance</div>
+
+      <div class="visualizacion-fila">
+        <canvas
+          id="trayectoria"
+          width="640"
+          height="360"
+          role="img"
+          aria-label="Trayectoria del proyectil"
+          hidden
+        ></canvas>
+        <div id="resumen" class="resumen" hidden></div>
+      </div>
+
+      <div class="tabla-envoltorio" hidden>
+        <table id="puntos" aria-label="Puntos de la trayectoria">
+          <caption>Puntos de la trayectoria</caption>
+          <thead>
+            <tr>
+              <th scope="col">t (s)</th>
+              <th scope="col">x (m)</th>
+              <th scope="col">y (m)</th>
+              <th scope="col">vx (m/s)</th>
+              <th scope="col">vy (m/s)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
   </main>
   <footer>
     <p>Simulador cliente-side &mdash; cero dependencias externas.</p>

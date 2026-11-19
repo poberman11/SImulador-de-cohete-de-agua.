@@ -541,6 +541,9 @@ window.fisica = window.appNamespace.fisica;
         }
       }
       console.log('window.lastSimulation:', window.lastSimulation);
+      if (typeof window.appNamespace.renderizarVisualizacion === 'function') {
+        window.appNamespace.renderizarVisualizacion(window.lastSimulation);
+      }
     } catch (error) {
       if (resultado) {
         resultado.textContent = 'Error al simular: ' + error.message;
@@ -552,4 +555,253 @@ window.fisica = window.appNamespace.fisica;
       }
     }
   });
+})();
+
+// --- Visualización: trayectoria (canvas), resumen y tabla de puntos (Task 7) ---
+(function inicializarVisualizacion() {
+  if (
+    typeof document === 'undefined' ||
+    typeof document.getElementById !== 'function'
+  ) {
+    return;
+  }
+
+  const canvas = document.getElementById('trayectoria');
+  const resumen = document.getElementById('resumen');
+  const tabla = document.getElementById('puntos');
+  const tablaBody = tabla && tabla.querySelector('tbody');
+  const estadoVacio = document.getElementById('estado-vacio');
+  if (!canvas || !resumen || !tablaBody || !estadoVacio) {
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  const COLOR_ACENTO = '#1a3c5e';
+  const COLOR_EJES = '#666';
+  const MARGEN = { izquierda: 46, derecha: 20, arriba: 18, abajo: 42 };
+
+  function escapeHtml(texto) {
+    const elemento = document.createElement('div');
+    elemento.textContent = texto;
+    return elemento.innerHTML;
+  }
+
+  function ajustarCanvas() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = canvas.getBoundingClientRect();
+    const ancho = Math.max(1, Math.round(rect.width * dpr));
+    const alto = Math.max(1, Math.round(rect.height * dpr));
+    canvas.width = ancho;
+    canvas.height = alto;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function limpiarLienzo() {
+    const dpr = window.devicePixelRatio || 1;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  function escalasPlot(puntos, anchoCss, altoCss) {
+    let xMax = 0;
+    let yMax = 0;
+    for (const p of puntos) {
+      if (p.x > xMax) xMax = p.x;
+      if (p.y > yMax) yMax = p.y;
+    }
+    if (!(xMax > 0)) xMax = 1;
+    if (!(yMax > 0)) yMax = 0.5;
+    return {
+      ancho: anchoCss,
+      alto: altoCss,
+      anchoPlot: anchoCss - MARGEN.izquierda - MARGEN.derecha,
+      altoPlot: altoCss - MARGEN.arriba - MARGEN.abajo,
+      xMax: xMax * 1.08,
+      yMax: yMax * 1.10,
+    };
+  }
+
+  function pxX(plot, x) {
+    return MARGEN.izquierda + (x / plot.xMax) * plot.anchoPlot;
+  }
+
+  function pxY(plot, altoCss, y) {
+    return altoCss - MARGEN.abajo - (y / plot.yMax) * plot.altoPlot;
+  }
+
+  function dibujarEjes(plot, altoCss) {
+    if (!(plot.xMax > 0) || !(plot.yMax > 0)) {
+      return;
+    }
+    const x0 = pxX(plot, 0);
+    const y0 = pxY(plot, altoCss, 0);
+
+    ctx.strokeStyle = COLOR_EJES;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(pxX(plot, plot.xMax), y0); // eje X
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x0, pxY(plot, altoCss, plot.yMax)); // eje Y
+    ctx.stroke();
+
+    const ticks = 5;
+    ctx.fillStyle = '#333';
+    ctx.font = '10px sans-serif';
+
+    // Marcas y etiquetas del eje X.
+    for (let i = 0; i <= ticks; i += 1) {
+      const x = (plot.xMax / ticks) * i;
+      const xPx = pxX(plot, x);
+      ctx.beginPath();
+      ctx.moveTo(xPx, y0);
+      ctx.lineTo(xPx, y0 + 4);
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(x.toFixed(0), xPx, y0 + 6);
+    }
+    ctx.textAlign = 'center';
+    ctx.fillText('X (m)', pxX(plot, plot.xMax), y0 + 22);
+
+    // Marcas y etiquetas del eje Y.
+    for (let i = 0; i <= ticks; i += 1) {
+      const y = (plot.yMax / ticks) * i;
+      const yPx = pxY(plot, altoCss, y);
+      ctx.beginPath();
+      ctx.moveTo(x0, yPx);
+      ctx.lineTo(x0 - 4, yPx);
+      ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(y.toFixed(0), x0 - 8, yPx);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillText('Y (m)', x0 - 8, MARGEN.arriba / 2);
+
+    // Origen (lanzador).
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(x0, y0, 3, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('Lanzador', x0 - 8, y0 - 8);
+  }
+
+  function dibujarTrayectoria(puntos, plot, altoCss) {
+    if (!puntos || puntos.length === 0) {
+      return;
+    }
+    ctx.strokeStyle = COLOR_ACENTO;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let primero = true;
+    for (const p of puntos) {
+      const xPx = pxX(plot, p.x);
+      const yPx = pxY(plot, altoCss, p.y);
+      if (primero) {
+        ctx.moveTo(xPx, yPx);
+        primero = false;
+      } else {
+        ctx.lineTo(xPx, yPx);
+      }
+    }
+    ctx.stroke();
+
+    const ultimo = puntos[puntos.length - 1];
+    ctx.fillStyle = COLOR_ACENTO;
+    ctx.beginPath();
+    ctx.arc(pxX(plot, ultimo.x), pxY(plot, altoCss, ultimo.y), 3, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+  function renderizar(sim) {
+    ajustarCanvas();
+    const dpr = window.devicePixelRatio || 1;
+    const anchoCss = canvas.width / dpr;
+    const altoCss = canvas.height / dpr;
+
+    const sinDatos =
+      !sim || !sim.despega || !Array.isArray(sim.puntos) || sim.puntos.length === 0;
+    if (sinDatos) {
+      estadoVacio.hidden = true;
+      canvas.hidden = true;
+      tabla.hidden = true;
+      limpiarLienzo();
+      resumen.hidden = false;
+      resumen.innerHTML =
+        sim && sim.mensaje
+          ? '<p class="mensaje">' + escapeHtml(sim.mensaje) + '</p>'
+          : '';
+      return;
+    }
+
+    estadoVacio.hidden = true;
+    canvas.hidden = false;
+    tabla.hidden = false;
+    resumen.hidden = false;
+    limpiarLienzo();
+
+    const plot = escalasPlot(sim.puntos, anchoCss, altoCss);
+    dibujarEjes(plot, altoCss);
+    dibujarTrayectoria(sim.puntos, plot, altoCss);
+
+    resumen.innerHTML =
+      '<div class="fila"><span class="etiqueta">v₀</span><span class="valor">' +
+      sim.v0.toFixed(2) +
+      ' m/s</span></div>' +
+      '<div class="fila"><span class="etiqueta">Tiempo de vuelo</span><span class="valor">' +
+      sim.tiempoVuelo.toFixed(2) +
+      ' s</span></div>' +
+      '<div class="fila"><span class="etiqueta">Posición final</span><span class="valor">(' +
+      sim.posicionFinal.x.toFixed(2) +
+      ' m, ' +
+      sim.posicionFinal.y.toFixed(2) +
+      ' m)</span></div>' +
+      '<div class="fila"><span class="etiqueta">Altura máxima</span><span class="valor">' +
+      sim.alturaMaxima.toFixed(2) +
+      ' m</span></div>';
+
+    tablaBody.innerHTML = '';
+    const fragmento = document.createDocumentFragment();
+    for (const p of sim.puntos) {
+      const fila = document.createElement('tr');
+      fila.innerHTML =
+        '<td>' +
+        p.t.toFixed(3) +
+        '</td><td>' +
+        p.x.toFixed(3) +
+        '</td><td>' +
+        p.y.toFixed(3) +
+        '</td><td>' +
+        p.vx.toFixed(3) +
+        '</td><td>' +
+        p.vy.toFixed(3) +
+        '</td>';
+      fragmento.appendChild(fila);
+    }
+    tablaBody.appendChild(fragmento);
+  }
+
+  function redibujar() {
+    const sim = window.lastSimulation;
+    if (sim && sim.despega) {
+      renderizar(sim);
+    }
+  }
+
+  window.addEventListener('resize', redibujar);
+
+  window.appNamespace = window.appNamespace || {};
+  window.appNamespace.renderizarVisualizacion = renderizar;
+
+  // Renderiza si ya hay una simulación previa (por ejemplo, tras recargar).
+  if (window.lastSimulation) {
+    renderizar(window.lastSimulation);
+  }
 })();
