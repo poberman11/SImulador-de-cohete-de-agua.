@@ -297,12 +297,19 @@ function integrarBalistica(estadoInicial, dt = DT_BALISTICA) {
     });
   }
 
+  // Defensa: si el último paso RK4 sobrepasó el suelo (y < 0), clamp a 0.
+  // Esto evita que la trayectoria se dibuje bajo el suelo en el canvas.
+  const ultimoPunto = puntos[puntos.length - 1];
+  if (ultimoPunto && ultimoPunto.y < 0) {
+    ultimoPunto.y = 0;
+  }
+
   // Impacto interpolado linealmente entre el último punto con y > 0 y el
   // primero con y <= 0.
   let impacto;
   if (puntos.length >= 2) {
     const previo = puntos[puntos.length - 2]; // y > 0
-    const actual = puntos[puntos.length - 1]; // y <= 0
+    const actual = puntos[puntos.length - 1]; // y <= 0 (clampeado a 0 si sobrepasó)
     const frac = previo.y / (previo.y - actual.y); // fracción del paso en que y cruza 0
     impacto = {
       t: previo.t + frac * (actual.t - previo.t),
@@ -445,7 +452,18 @@ function simularLanzamiento({ litrosProyectil, litrosAgua, psi, anguloGrados }) 
     if (tProp + p.t === tProp) {
       continue;
     }
-    puntos.push({ t: tProp + p.t, x: p.x, y: p.y, vx: p.vx, vy: p.vy });
+    // Defensa en profundidad: no llevar puntos bajo el suelo al trazado final.
+    if (p.y < 0) {
+      continue;
+    }
+    puntos.push({ t: tProp + p.t, x: p.x, y: Math.max(0, p.y), vx: p.vx, vy: p.vy });
+  }
+
+  // --- Defensa final: ningún punto de trazado bajo el suelo (y < 0).
+  for (const p of puntos) {
+    if (p.y < 0) {
+      p.y = 0;
+    }
   }
 
   // --- Altura máxima sobre todos los puntos de ambas fases ---

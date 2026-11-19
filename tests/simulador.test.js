@@ -164,4 +164,15 @@ describe('simulador', () => {
     expect(finito(res.alturaMaxima)).toBe(true);
     expect(res.tiempoVuelo).toBeGreaterThan(0);
   });
+
+  it('ningún punto de la trayectoria tiene y < 0 (no traspasa el suelo)', () => {
+    for (const angulo of [0, 15, 30, 45, 60, 75, 90]) {
+      const res = simularLanzamiento({ ...VALID, anguloGrados: angulo });
+      expect(res.despega).toBe(true);
+      for (const p of res.puntos) {
+        expect(p.y).toBeGreaterThanOrEqual(0);
+      }
+      expect(res.posicionFinal.y).toBeGreaterThanOrEqual(0);
+    }
+  });
 });
