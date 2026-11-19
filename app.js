@@ -9,6 +9,7 @@ const AREA_BOQUILLA = 1e-4;     // m² (área de boquilla de referencia)
 const CD = 0.9;                 // coeficiente de descarga del chorro
 const CD_AIRE = 0.47;           // coeficiente de arrastre (esfera)
 const AREA_FRONTAL = 0.01;      // m² (área frontal de referencia)
+const V_TANQUE = 0.002;         // m³ capacidad del tanque (2 litros)
 
 /** Convierte litros a metros cúbicos. */
 function litrosAMetrosCubicos(litros) {
@@ -202,6 +203,7 @@ function integrarPropulsion(estadoInicial, params, dt = DT_PROPULSION) {
     masa: ultimo.masa,
     volAgua: ultimo.volAgua,
     presion: ultimo.presion,
+    t: ultimo.t, // instante de salida del lanzador (útil para el orquestador)
   };
   return { puntos, estadoFinal };
 }
@@ -223,6 +225,19 @@ function integrarPropulsion(estadoInicial, params, dt = DT_PROPULSION) {
  */
 function integrarBalistica(estadoInicial, dt = DT_BALISTICA) {
   const m = estadoInicial.masa;
+  if (!(m > 0)) {
+    // Defensa: masa no positiva no puede integrarse (división por cero).
+    return {
+      puntos: [{
+        t: 0,
+        x: estadoInicial.x,
+        y: estadoInicial.y,
+        vx: estadoInicial.vx,
+        vy: estadoInicial.vy,
+      }],
+      impacto: { t: 0, x: estadoInicial.x, y: estadoInicial.y },
+    };
+  }
 
   function derivada(estado) {
     const { vx, vy } = estado;
@@ -302,6 +317,118 @@ function integrarBalistica(estadoInicial, dt = DT_BALISTICA) {
   return { puntos, impacto };
 }
 
+/**
+ * Orquesta la simulación completa: fase 1 (propulsión) → fase 2 (balística).
+ *
+ * Entradas (unidades de usuario):
+ *   litrosProyectil: masa del proyectil vacío, numéricamente en kg
+ *                    (equivalente agua: 1 L ≈ 1 kg).
+ *   litrosAgua:      volumen de agua en el tanque, en litros (0 < v <= 2 L).
+ *   psi:             presión inicial del aire, manométrica, en PSI (> 0).
+ *   anguloGrados:    ángulo de lanzamiento en grados [0, 90].
+ *
+ * Salida: { v0, tiempoVuelo, posicionFinal: {x, y}, alturaMaxima,
+ *           puntos: Array<{t, x, y, vx, vy}>, despega, mensaje? }
+ *
+ * Muestreo de puntos: se fusionan los puntos de ambas fases tal cual los
+ * produce el integrador RK4 (paso 0,001 s en propulsión, 0,01 s en
+ * balística), desplazando el tiempo de la fase balística por la duración
+ * de la propulsión. No se interpola entre pasos: se documenta esta
+ * elección (muestreo por paso de integración en lugar de una rejilla cada
+ * 0,05 s) para preservar los estados exactos de RK4, incluido v₀ en la
+ * salida del lanzador, sin error de muestreo intermedio.
+ */
+function simularLanzamiento({ litrosProyectil, litrosAgua, psi, anguloGrados }) {
+  // --- Validación de entradas ---
+  if (!(litrosProyectil > 0)) {
+    return { despega: false, mensaje: 'litrosProyectil debe ser mayor que 0.' };
+  }
+  const litrosTanque = V_TANQUE / LITRO_A_M3; // 2 L
+  if (!(litrosAgua > 0) || litrosAgua > litrosTanque) {
+    return {
+      despega: false,
+      mensaje: `litrosAgua debe ser mayor que 0 y menor o igual a ${litrosTanque} litros (capacidad del tanque).`,
+    };
+  }
+  if (!(psi > 0)) {
+    return { despega: false, mensaje: 'psi debe ser mayor que 0.' };
+  }
+  if (!(anguloGrados >= 0 && anguloGrados <= 90)) {
+    return { despega: false, mensaje: 'anguloGrados debe estar entre 0 y 90 grados.' };
+  }
+
+  const mProyectil = litrosProyectil; // kg
+  const volAgua = litrosAgua * LITRO_A_M3;
+
+  // --- Comprobación de despegue: empuje inicial debe superar el peso ---
+  const { fuerza: empujeInicial } = empuje(psi, volAgua, V_TANQUE, AREA_BOQUILLA, CD);
+  const peso = mProyectil * GRAVEDAD;
+  if (empujeInicial <= peso) {
+    return {
+      despega: false,
+      mensaje: `No despega: empuje inicial (${empujeInicial.toFixed(2)} N) <= peso del proyectil (${peso.toFixed(2)} N).`,
+    };
+  }
+
+  // --- Fase 1: propulsión (estado en la salida del lanzador) ---
+  const estadoInicialProp = {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    masa: mProyectil + RHO_AGUA * volAgua,
+    volAgua,
+  };
+  const paramsProp = {
+    anguloGrados,
+    mProyectil,
+    volAguaInicial: volAgua,
+    psiInicial: psi,
+    volTanque: V_TANQUE,
+    areaBoquilla: AREA_BOQUILLA,
+    cd: CD,
+  };
+  const { puntos: puntosProp, estadoFinal } = integrarPropulsion(estadoInicialProp, paramsProp);
+  const tProp = estadoFinal.t;
+  const v0 = Math.hypot(estadoFinal.vx, estadoFinal.vy);
+
+  // --- Fase 2: balística desde la salida del lanzador hasta el impacto ---
+  const estadoInicialBal = {
+    x: estadoFinal.x,
+    y: estadoFinal.y,
+    vx: estadoFinal.vx,
+    vy: estadoFinal.vy,
+    masa: estadoFinal.masa,
+  };
+  const { puntos: puntosBal, impacto } = integrarBalistica(estadoInicialBal);
+
+  // --- Fusión de puntos: tiempo de balística desplazado por tProp ---
+  const puntos = [];
+  for (const p of puntosProp) {
+    puntos.push({ t: p.t, x: p.x, y: p.y, vx: p.vx, vy: p.vy });
+  }
+  for (const p of puntosBal) {
+    puntos.push({ t: tProp + p.t, x: p.x, y: p.y, vx: p.vx, vy: p.vy });
+  }
+
+  // --- Altura máxima sobre todos los puntos de ambas fases ---
+  let alturaMaxima = 0;
+  for (const p of puntos) {
+    if (p.y > alturaMaxima) {
+      alturaMaxima = p.y;
+    }
+  }
+
+  return {
+    v0,
+    tiempoVuelo: tProp + impacto.t,
+    posicionFinal: { x: impacto.x, y: impacto.y },
+    alturaMaxima,
+    puntos,
+    despega: true,
+  };
+}
+
 window.appNamespace = {
   fisica: {
     litrosAMetrosCubicos,
@@ -313,6 +440,7 @@ window.appNamespace = {
   },
   integrarPropulsion,
   integrarBalistica,
+  simularLanzamiento,
 };
 
 // Alias de conveniencia para consumir directamente `fisica` en tests.
