@@ -445,3 +445,111 @@ window.appNamespace = {
 
 // Alias de conveniencia para consumir directamente `fisica` en tests.
 window.fisica = window.appNamespace.fisica;
+
+// --- UI: formulario de lanzamiento (Task 6) ---
+(function inicializarFormularioLanzamiento() {
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') {
+    return;
+  }
+  const form = document.getElementById('form-lanzamiento');
+  if (!form) {
+    return;
+  }
+
+  const inputs = {
+    litrosProyectil: document.getElementById('litros-proyectil'),
+    litrosAgua: document.getElementById('litros-agua'),
+    psi: document.getElementById('psi'),
+    anguloGrados: document.getElementById('angulo'),
+  };
+  const errores = {
+    litrosProyectil: document.getElementById('error-litros-proyectil'),
+    litrosAgua: document.getElementById('error-litros-agua'),
+    psi: document.getElementById('error-psi'),
+    anguloGrados: document.getElementById('error-angulo'),
+  };
+  const boton = form.querySelector('button[type="submit"]');
+  const resultado = document.getElementById('resultado');
+  const litrosTanque = V_TANQUE / LITRO_A_M3; // 2 L
+
+  function limpiarErrores() {
+    for (const clave of Object.keys(errores)) {
+      errores[clave].textContent = '';
+    }
+    if (resultado) {
+      resultado.textContent = '';
+    }
+  }
+
+  function mostrarError(clave, mensaje) {
+    errores[clave].textContent = mensaje;
+  }
+
+  function validar() {
+    limpiarErrores();
+
+    const litrosProyectil = Number(inputs.litrosProyectil.value);
+    const litrosAgua = Number(inputs.litrosAgua.value);
+    const psi = Number(inputs.psi.value);
+    const anguloGrados = Number(inputs.anguloGrados.value);
+
+    let valido = true;
+
+    if (!(litrosProyectil > 0)) {
+      mostrarError('litrosProyectil', 'Debe ser mayor que 0.');
+      valido = false;
+    }
+    if (!(litrosAgua > 0) || litrosAgua > litrosTanque) {
+      mostrarError('litrosAgua', `Debe ser mayor que 0 y menor o igual a ${litrosTanque} L.`);
+      valido = false;
+    }
+    if (!(psi > 0)) {
+      mostrarError('psi', 'Debe ser mayor que 0.');
+      valido = false;
+    }
+    if (!(anguloGrados >= 0 && anguloGrados <= 90)) {
+      mostrarError('anguloGrados', 'Debe estar entre 0 y 90 grados.');
+      valido = false;
+    }
+
+    return valido
+      ? { litrosProyectil, litrosAgua, psi, anguloGrados }
+      : null;
+  }
+
+  form.addEventListener('submit', (evento) => {
+    evento.preventDefault();
+    const datos = validar();
+    if (!datos) {
+      return;
+    }
+    if (boton) {
+      boton.disabled = true;
+    }
+    try {
+      window.lastSimulation = simularLanzamiento(datos);
+      if (resultado) {
+        if (window.lastSimulation.despega) {
+          resultado.textContent =
+            'Lanzamiento OK — v0: ' +
+            window.lastSimulation.v0.toFixed(2) +
+            ' m/s, alcance: ' +
+            window.lastSimulation.posicionFinal.x.toFixed(2) +
+            ' m.';
+        } else {
+          resultado.textContent = 'No despega: ' + window.lastSimulation.mensaje;
+        }
+      }
+      console.log('window.lastSimulation:', window.lastSimulation);
+    } catch (error) {
+      if (resultado) {
+        resultado.textContent = 'Error al simular: ' + error.message;
+      }
+      console.error(error);
+    } finally {
+      if (boton) {
+        boton.disabled = false;
+      }
+    }
+  });
+})();

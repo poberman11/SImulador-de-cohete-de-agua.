@@ -18,3 +18,70 @@ body {
 header, main, footer {
   padding: 1rem;
 }
+
+/* --- Formulario de lanzamiento (sobrio, sin adornos decorativos) --- */
+#form-lanzamiento {
+  max-width: 420px;
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.campo label {
+  font-size: 0.9rem;
+  color: #111;
+}
+
+.campo input[type="number"] {
+  padding: 0.4rem 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #999;
+  border-radius: 3px;
+}
+
+.error {
+  color: #b00020;
+  font-size: 0.85rem;
+  min-height: 1.1em;
+}
+
+.acciones {
+  margin-top: 0.5rem;
+}
+
+button[type="submit"] {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  background: #111;
+  color: #fff;
+  border: 1px solid #111;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+button[type="submit"]:hover {
+  background: #333;
+}
+
+button[type="submit"]:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 2px;
+}
+
+button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.resultado {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #333;
+  min-height: 1.2em;
+}
