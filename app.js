@@ -419,7 +419,7 @@ function simularLanzamiento({ litrosProyectil, litrosAgua, psi, anguloGrados }) 
     }
   }
 
-  return {
+  const resultado = {
     v0,
     tiempoVuelo: tProp + impacto.t,
     posicionFinal: { x: impacto.x, y: impacto.y },
@@ -427,6 +427,23 @@ function simularLanzamiento({ litrosProyectil, litrosAgua, psi, anguloGrados }) 
     puntos,
     despega: true,
   };
+
+  // Guardia final: ningún valor no finito llega al renderizador.
+  const finito = (n) => typeof n === 'number' && isFinite(n);
+  if (
+    !finito(resultado.v0) ||
+    !finito(resultado.tiempoVuelo) ||
+    !finito(resultado.posicionFinal.x) ||
+    !finito(resultado.posicionFinal.y) ||
+    !finito(resultado.alturaMaxima)
+  ) {
+    return {
+      despega: false,
+      mensaje: 'Error interno: la simulación produjo valores no válidos.',
+    };
+  }
+
+  return resultado;
 }
 
 window.appNamespace = {
@@ -537,7 +554,7 @@ window.fisica = window.appNamespace.fisica;
             window.lastSimulation.posicionFinal.x.toFixed(2) +
             ' m.';
         } else {
-          resultado.textContent = 'No despega: ' + window.lastSimulation.mensaje;
+          resultado.textContent = window.lastSimulation.mensaje;
         }
       }
       console.log('window.lastSimulation:', window.lastSimulation);
@@ -727,19 +744,39 @@ window.fisica = window.appNamespace.fisica;
     const anchoCss = canvas.width / dpr;
     const altoCss = canvas.height / dpr;
 
-    const sinDatos =
-      !sim || !sim.despega || !Array.isArray(sim.puntos) || sim.puntos.length === 0;
-    if (sinDatos) {
+    const datosValidos =
+      sim &&
+      sim.despega === true &&
+      Array.isArray(sim.puntos) &&
+      sim.puntos.length > 0 &&
+      typeof sim.v0 === 'number' &&
+      isFinite(sim.v0) &&
+      typeof sim.tiempoVuelo === 'number' &&
+      isFinite(sim.tiempoVuelo) &&
+      sim.posicionFinal &&
+      typeof sim.posicionFinal.x === 'number' &&
+      isFinite(sim.posicionFinal.x) &&
+      typeof sim.posicionFinal.y === 'number' &&
+      isFinite(sim.posicionFinal.y) &&
+      typeof sim.alturaMaxima === 'number' &&
+      isFinite(sim.alturaMaxima);
+
+    if (!datosValidos) {
       estadoVacio.hidden = true;
       canvas.hidden = true;
       tabla.hidden = true;
       envoltorio.hidden = true;
       limpiarLienzo();
       resumen.hidden = false;
-      resumen.innerHTML =
-        sim && sim.mensaje
-          ? '<p class="mensaje">' + escapeHtml(sim.mensaje) + '</p>'
-          : '';
+      let mensajeHtml = '';
+      if (sim && sim.mensaje) {
+        mensajeHtml = '<p class="mensaje">' + escapeHtml(sim.mensaje) + '</p>';
+      } else if (sim && sim.despega === true) {
+        // despega: true pero valores no finitos: defensa contra NaN en el render.
+        mensajeHtml =
+          '<p class="mensaje">Error: la simulación produjo valores no válidos.</p>';
+      }
+      resumen.innerHTML = mensajeHtml;
       return;
     }
 

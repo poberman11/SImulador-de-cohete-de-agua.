@@ -89,4 +89,72 @@ describe('simulador', () => {
     expect(res.despega).toBe(true);
     expect(Math.abs(res.posicionFinal.x)).toBeLessThan(1);
   });
+
+  // --- Casos borde (Task 8) ---
+
+  it('agua = 0 → despega=false con mensaje claro, sin lanzar', () => {
+    const res = simularLanzamiento({ ...VALID, litrosAgua: 0 });
+    expect(res.despega).toBe(false);
+    expect(typeof res.mensaje).toBe('string');
+    expect(res.mensaje.length).toBeGreaterThan(0);
+    expect(res.mensaje.toLowerCase().includes('agua')).toBe(true);
+  });
+
+  it('agua negativa → despega=false con mensaje claro', () => {
+    const res = simularLanzamiento({ ...VALID, litrosAgua: -0.5 });
+    expect(res.despega).toBe(false);
+    expect(typeof res.mensaje).toBe('string');
+    expect(res.mensaje.length).toBeGreaterThan(0);
+  });
+
+  it('psi = 0 → despega=false con mensaje claro, sin lanzar', () => {
+    const res = simularLanzamiento({ ...VALID, psi: 0 });
+    expect(res.despega).toBe(false);
+    expect(typeof res.mensaje).toBe('string');
+    expect(res.mensaje.length).toBeGreaterThan(0);
+    expect(res.mensaje.toLowerCase().includes('psi')).toBe(true);
+  });
+
+  it('tanque más allá de capacidad (3 L > 2 L) → error de validación', () => {
+    const res = simularLanzamiento({ ...VALID, litrosAgua: 3 });
+    expect(res.despega).toBe(false);
+    expect(typeof res.mensaje).toBe('string');
+    expect(res.mensaje.length).toBeGreaterThan(0);
+    expect(res.mensaje.includes('2 litros')).toBe(true);
+  });
+
+  it('empuje insuficiente → "no despega", sin trazado de trayectoria', () => {
+    const res = simularLanzamiento({ litrosProyectil: 10, litrosAgua: 0.1, psi: 5, anguloGrados: 45 });
+    expect(res.despega).toBe(false);
+    expect(typeof res.mensaje).toBe('string');
+    expect(res.mensaje.toLowerCase().includes('no despega')).toBe(true);
+    expect(Array.isArray(res.puntos)).toBe(false);
+  });
+
+  it('cuando despega=true, ningún valor de salida es NaN ni infinito', () => {
+    const res = simularLanzamiento(VALID);
+    expect(res.despega).toBe(true);
+    const finito = (n) => typeof n === 'number' && isFinite(n);
+    expect(finito(res.v0)).toBe(true);
+    expect(finito(res.tiempoVuelo)).toBe(true);
+    expect(finito(res.posicionFinal.x)).toBe(true);
+    expect(finito(res.posicionFinal.y)).toBe(true);
+    expect(finito(res.alturaMaxima)).toBe(true);
+    for (const p of res.puntos) {
+      expect(finito(p.t)).toBe(true);
+      expect(finito(p.x)).toBe(true);
+      expect(finito(p.y)).toBe(true);
+      expect(finito(p.vx)).toBe(true);
+      expect(finito(p.vy)).toBe(true);
+    }
+  });
+
+  it('lanzamiento vertical (90°) → x permanece ≈ 0 en todo el recorrido', () => {
+    const res = simularLanzamiento({ ...VALID, anguloGrados: 90 });
+    expect(res.despega).toBe(true);
+    for (const p of res.puntos) {
+      expect(Math.abs(p.x)).toBeLessThan(1e-6);
+    }
+    expect(Math.abs(res.posicionFinal.x)).toBeLessThan(1e-6);
+  });
 });
