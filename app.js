@@ -572,7 +572,7 @@ window.fisica = window.appNamespace.fisica;
   const envoltorio = document.getElementById('envoltorio-puntos');
   const tablaBody = tabla && tabla.querySelector('tbody');
   const estadoVacio = document.getElementById('estado-vacio');
-  if (!canvas || !resumen || !tablaBody || !estadoVacio) {
+  if (!canvas || !resumen || !tablaBody || !estadoVacio || !envoltorio) {
     return;
   }
 
