@@ -37,9 +37,19 @@ export function expect(actual) {
         throw new Error(`expected ${actual} > ${expected}`);
       }
     },
+    toBeGreaterThanOrEqual(expected) {
+      if (!(actual >= expected)) {
+        throw new Error(`expected ${actual} >= ${expected}`);
+      }
+    },
     toBeLessThan(expected) {
       if (!(actual < expected)) {
         throw new Error(`expected ${actual} < ${expected}`);
+      }
+    },
+    toBeLessThanOrEqual(expected) {
+      if (!(actual <= expected)) {
+        throw new Error(`expected ${actual} <= ${expected}`);
       }
     },
   };
