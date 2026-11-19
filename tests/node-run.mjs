@@ -11,6 +11,7 @@ globalThis.fisica = globalThis.window.appNamespace.fisica;
 
 const { summary } = await import('./test-runner.js');
 await import('./fisica-utilidades.test.js');
+await import('./fisica-propulsion.test.js');
 
 const s = summary();
 console.log(`\nResultados: PASSED=${s.passes} FAILED=${s.failures}`);
