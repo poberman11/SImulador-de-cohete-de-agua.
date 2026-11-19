@@ -341,20 +341,49 @@ function integrarBalistica(estadoInicial, dt = DT_BALISTICA) {
 function simularLanzamiento({ litrosProyectil, litrosAgua, psi, anguloGrados }) {
   // --- Validación de entradas ---
   if (!(litrosProyectil > 0)) {
-    return { despega: false, mensaje: 'litrosProyectil debe ser mayor que 0.' };
+    return {
+      despega: false,
+      mensaje: 'litrosProyectil debe ser mayor que 0.',
+      v0: 0,
+      tiempoVuelo: 0,
+      posicionFinal: { x: 0, y: 0 },
+      alturaMaxima: 0,
+      puntos: [],
+    };
   }
   const litrosTanque = V_TANQUE / LITRO_A_M3; // 2 L
   if (!(litrosAgua > 0) || litrosAgua > litrosTanque) {
     return {
       despega: false,
       mensaje: `litrosAgua debe ser mayor que 0 y menor o igual a ${litrosTanque} litros (capacidad del tanque).`,
+      v0: 0,
+      tiempoVuelo: 0,
+      posicionFinal: { x: 0, y: 0 },
+      alturaMaxima: 0,
+      puntos: [],
     };
   }
   if (!(psi > 0)) {
-    return { despega: false, mensaje: 'psi debe ser mayor que 0.' };
+    return {
+      despega: false,
+      mensaje: 'psi debe ser mayor que 0.',
+      v0: 0,
+      tiempoVuelo: 0,
+      posicionFinal: { x: 0, y: 0 },
+      alturaMaxima: 0,
+      puntos: [],
+    };
   }
   if (!(anguloGrados >= 0 && anguloGrados <= 90)) {
-    return { despega: false, mensaje: 'anguloGrados debe estar entre 0 y 90 grados.' };
+    return {
+      despega: false,
+      mensaje: 'anguloGrados debe estar entre 0 y 90 grados.',
+      v0: 0,
+      tiempoVuelo: 0,
+      posicionFinal: { x: 0, y: 0 },
+      alturaMaxima: 0,
+      puntos: [],
+    };
   }
 
   const mProyectil = litrosProyectil; // kg
@@ -367,6 +396,11 @@ function simularLanzamiento({ litrosProyectil, litrosAgua, psi, anguloGrados }) 
     return {
       despega: false,
       mensaje: `No despega: empuje inicial (${empujeInicial.toFixed(2)} N) <= peso del proyectil (${peso.toFixed(2)} N).`,
+      v0: 0,
+      tiempoVuelo: 0,
+      posicionFinal: { x: 0, y: 0 },
+      alturaMaxima: 0,
+      puntos: [],
     };
   }
 
@@ -408,6 +442,9 @@ function simularLanzamiento({ litrosProyectil, litrosAgua, psi, anguloGrados }) 
     puntos.push({ t: p.t, x: p.x, y: p.y, vx: p.vx, vy: p.vy });
   }
   for (const p of puntosBal) {
+    if (tProp + p.t === tProp) {
+      continue;
+    }
     puntos.push({ t: tProp + p.t, x: p.x, y: p.y, vx: p.vx, vy: p.vy });
   }
 
@@ -491,7 +528,7 @@ window.fisica = window.appNamespace.fisica;
 
   function limpiarErrores() {
     for (const clave of Object.keys(errores)) {
-      errores[clave].textContent = '';
+      if (errores[clave]) errores[clave].textContent = '';
     }
     if (resultado) {
       resultado.textContent = '';
@@ -499,7 +536,7 @@ window.fisica = window.appNamespace.fisica;
   }
 
   function mostrarError(clave, mensaje) {
-    errores[clave].textContent = mensaje;
+    if (errores[clave]) errores[clave].textContent = mensaje;
   }
 
   function validar() {
@@ -615,7 +652,6 @@ window.fisica = window.appNamespace.fisica;
   }
 
   function limpiarLienzo() {
-    const dpr = window.devicePixelRatio || 1;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);

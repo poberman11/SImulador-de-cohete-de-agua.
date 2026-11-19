@@ -84,12 +84,6 @@ describe('simulador', () => {
     expect(res.alturaMaxima).toBeGreaterThan(0);
   });
 
-  it('lanzamiento vertical (90°) aterriza en x ≈ x de salida', () => {
-    const res = simularLanzamiento({ ...VALID, anguloGrados: 90 });
-    expect(res.despega).toBe(true);
-    expect(Math.abs(res.posicionFinal.x)).toBeLessThan(1);
-  });
-
   // --- Casos borde (Task 8) ---
 
   it('agua = 0 → despega=false con mensaje claro, sin lanzar', () => {
@@ -128,7 +122,8 @@ describe('simulador', () => {
     expect(res.despega).toBe(false);
     expect(typeof res.mensaje).toBe('string');
     expect(res.mensaje.toLowerCase().includes('no despega')).toBe(true);
-    expect(Array.isArray(res.puntos)).toBe(false);
+    expect(Array.isArray(res.puntos)).toBe(true);
+    expect(res.puntos.length).toBe(0);
   });
 
   it('cuando despega=true, ningún valor de salida es NaN ni infinito', () => {
@@ -156,5 +151,17 @@ describe('simulador', () => {
       expect(Math.abs(p.x)).toBeLessThan(1e-6);
     }
     expect(Math.abs(res.posicionFinal.x)).toBeLessThan(1e-6);
+  });
+
+  it('anguloGrados = 0° despega=true con salidas finitas', () => {
+    const res = simularLanzamiento({ ...VALID, anguloGrados: 0 });
+    expect(res.despega).toBe(true);
+    const finito = (n) => typeof n === 'number' && isFinite(n);
+    expect(finito(res.v0)).toBe(true);
+    expect(finito(res.tiempoVuelo)).toBe(true);
+    expect(finito(res.posicionFinal.x)).toBe(true);
+    expect(finito(res.posicionFinal.y)).toBe(true);
+    expect(finito(res.alturaMaxima)).toBe(true);
+    expect(res.tiempoVuelo).toBeGreaterThan(0);
   });
 });

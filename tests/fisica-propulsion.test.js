@@ -65,7 +65,7 @@ describe('fisica.propulsion', () => {
     }
     // El último punto debe estar vacío (o el paso anterior quedó vaciado).
     const ultimo = res.puntos[res.puntos.length - 1];
-    expect(ultimo.volAgua).toBeLessThan(ESTADO_INICIAL.volAgua + 1e-15);
+    expect(ultimo.volAgua).toBe(0);
   });
 
   it('presión no negativa en todos los puntos', () => {
