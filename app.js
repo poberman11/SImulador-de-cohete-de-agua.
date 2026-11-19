@@ -569,6 +569,7 @@ window.fisica = window.appNamespace.fisica;
   const canvas = document.getElementById('trayectoria');
   const resumen = document.getElementById('resumen');
   const tabla = document.getElementById('puntos');
+  const envoltorio = document.getElementById('envoltorio-puntos');
   const tablaBody = tabla && tabla.querySelector('tbody');
   const estadoVacio = document.getElementById('estado-vacio');
   if (!canvas || !resumen || !tablaBody || !estadoVacio) {
@@ -732,6 +733,7 @@ window.fisica = window.appNamespace.fisica;
       estadoVacio.hidden = true;
       canvas.hidden = true;
       tabla.hidden = true;
+      envoltorio.hidden = true;
       limpiarLienzo();
       resumen.hidden = false;
       resumen.innerHTML =
@@ -744,6 +746,7 @@ window.fisica = window.appNamespace.fisica;
     estadoVacio.hidden = true;
     canvas.hidden = false;
     tabla.hidden = false;
+    envoltorio.hidden = false;
     resumen.hidden = false;
     limpiarLienzo();
 
