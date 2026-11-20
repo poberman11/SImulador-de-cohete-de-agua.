@@ -1,78 +1,215 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="h-full">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#020617">
   <title>Simulador de Proyectil de Agua</title>
-  <link rel="stylesheet" href="style.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Estilos para el HTML que app.js inyecta dinámicamente (resumen y tabla) -->
+  <style type="text/tailwindcss">
+    [hidden] { display: none !important; }
+
+    /* Canvas: app.js dibuja en tonos oscuros; se invierten para el modo oscuro
+       sin tocar la lógica de dibujo. El fondo transparente deja ver la cuadrícula. */
+    #trayectoria { filter: invert(1) hue-rotate(180deg) saturate(1.6) brightness(1.05); }
+
+    .resumen .fila {
+      @apply flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-900/70 px-4 py-3;
+    }
+    .resumen .etiqueta {
+      @apply text-[11px] font-medium uppercase tracking-wider text-slate-400;
+    }
+    .resumen .valor {
+      @apply font-mono text-lg font-semibold text-cyan-300 tabular-nums leading-tight;
+    }
+    .resumen .mensaje {
+      @apply col-span-full rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300;
+    }
+
+    #puntos tbody td {
+      @apply border-b border-slate-800/80 px-4 py-1.5 text-right font-mono text-xs tabular-nums text-slate-300 whitespace-nowrap;
+    }
+    #puntos tbody td:first-child { @apply text-left text-slate-400; }
+    #puntos tbody tr:hover { @apply bg-slate-800/50; }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { opacity: 0.4; }
+  </style>
 </head>
-<body>
-  <header>
-    <h1>Simulador de Proyectil de Agua</h1>
-  </header>
-  <main>
-    <form id="form-lanzamiento" novalidate>
-      <div class="campo">
-        <label for="litros-proyectil">Litros del proyectil (kg-equivalente)</label>
-        <input type="number" id="litros-proyectil" name="litrosProyectil" step="0.01" min="0" required>
-        <span class="error" id="error-litros-proyectil" aria-live="polite"></span>
-      </div>
-      <div class="campo">
-        <label for="litros-agua">Litros de agua (máx. 2 L)</label>
-        <input type="number" id="litros-agua" name="litrosAgua" step="0.01" min="0" max="2" required>
-        <span class="error" id="error-litros-agua" aria-live="polite"></span>
-      </div>
-      <div class="campo">
-        <label for="psi">Presión (PSI)</label>
-        <input type="number" id="psi" name="psi" step="0.1" min="0" required>
-        <span class="error" id="error-psi" aria-live="polite"></span>
-      </div>
-      <div class="campo">
-        <label for="angulo">Ángulo de lanzamiento (°)</label>
-        <input type="number" id="angulo" name="anguloGrados" step="0.1" min="0" max="90" required>
-        <span class="error" id="error-angulo" aria-live="polite"></span>
-      </div>
-      <div class="acciones">
-        <button type="submit">Simular / Lanzar</button>
-      </div>
-    </form>
-    <div id="resultado" class="resultado" aria-live="polite"></div>
+<body class="h-full bg-slate-950 font-sans text-slate-200 antialiased">
+  <div class="flex min-h-full flex-col lg:h-full lg:flex-row">
 
-    <section id="visualizacion" aria-label="Visualización del lanzamiento">
-      <div id="estado-vacio" class="estado-vacio">Complete los datos y lance</div>
+    <!-- ===== Panel lateral de controles ===== -->
+    <aside class="flex w-full shrink-0 flex-col border-b border-slate-800 bg-slate-950 lg:h-full lg:w-[340px] lg:border-b-0 lg:border-r">
+      <header class="flex items-center gap-3 border-b border-slate-800 px-5 py-4">
+        <div class="flex size-9 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="size-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 20c4-10 10-14 18-15"/><circle cx="21" cy="5" r="1.5" fill="currentColor"/><path d="M3 20h18"/>
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="truncate text-sm font-semibold text-slate-100">Simulador de Proyectil de Agua</h1>
+          <p class="font-mono text-[11px] text-slate-500">RK4 · propulsión + balística</p>
+        </div>
+      </header>
 
-      <div class="visualizacion-fila">
-        <canvas
-          id="trayectoria"
-          width="640"
-          height="360"
-          role="img"
-          aria-label="Trayectoria del proyectil"
-          hidden
-        ></canvas>
-        <div id="resumen" class="resumen" hidden></div>
+      <div class="flex-1 overflow-y-auto px-5 py-5">
+        <form id="form-lanzamiento" novalidate class="flex flex-col gap-4">
+
+          <fieldset class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+            <legend class="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Masa</legend>
+            <div class="campo flex flex-col gap-1.5">
+              <label for="litros-proyectil" class="text-sm text-slate-300">Litros del proyectil <span class="text-slate-500">(kg-equivalente)</span></label>
+              <div class="flex items-center rounded-lg border border-slate-700 bg-slate-950 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20">
+                <input type="number" id="litros-proyectil" name="litrosProyectil" step="0.01" min="0" required placeholder="0.15"
+                  class="w-full min-w-0 bg-transparent px-3 py-2 font-mono text-base text-cyan-300 placeholder:text-slate-600 focus:outline-none">
+                <span class="pr-3 font-mono text-xs text-slate-500">kg</span>
+              </div>
+              <span class="error min-h-[1rem] text-xs text-rose-400" id="error-litros-proyectil" aria-live="polite"></span>
+            </div>
+          </fieldset>
+
+          <fieldset class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+            <legend class="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Tanque</legend>
+            <div class="flex flex-col gap-3">
+              <div class="campo flex flex-col gap-1.5">
+                <label for="litros-agua" class="text-sm text-slate-300">Litros de agua <span class="text-slate-500">(máx. 2 L)</span></label>
+                <div class="flex items-center rounded-lg border border-slate-700 bg-slate-950 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20">
+                  <input type="number" id="litros-agua" name="litrosAgua" step="0.01" min="0" max="2" required placeholder="0.6"
+                    class="w-full min-w-0 bg-transparent px-3 py-2 font-mono text-base text-cyan-300 placeholder:text-slate-600 focus:outline-none">
+                  <span class="pr-3 font-mono text-xs text-slate-500">L</span>
+                </div>
+                <span class="error min-h-[1rem] text-xs text-rose-400" id="error-litros-agua" aria-live="polite"></span>
+              </div>
+              <div class="campo flex flex-col gap-1.5">
+                <label for="psi" class="text-sm text-slate-300">Presión inicial</label>
+                <div class="flex items-center rounded-lg border border-slate-700 bg-slate-950 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20">
+                  <input type="number" id="psi" name="psi" step="0.1" min="0" required placeholder="60"
+                    class="w-full min-w-0 bg-transparent px-3 py-2 font-mono text-base text-cyan-300 placeholder:text-slate-600 focus:outline-none">
+                  <span class="pr-3 font-mono text-xs text-slate-500">PSI</span>
+                </div>
+                <span class="error min-h-[1rem] text-xs text-rose-400" id="error-psi" aria-live="polite"></span>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+            <legend class="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Lanzamiento</legend>
+            <div class="campo flex flex-col gap-1.5">
+              <label for="angulo" class="text-sm text-slate-300">Ángulo de lanzamiento</label>
+              <div class="flex items-center rounded-lg border border-slate-700 bg-slate-950 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20">
+                <input type="number" id="angulo" name="anguloGrados" step="0.1" min="0" max="90" required placeholder="45"
+                  class="w-full min-w-0 bg-transparent px-3 py-2 font-mono text-base text-cyan-300 placeholder:text-slate-600 focus:outline-none">
+                <span class="pr-3 font-mono text-xs text-slate-500">°</span>
+              </div>
+              <span class="error min-h-[1rem] text-xs text-rose-400" id="error-angulo" aria-live="polite"></span>
+            </div>
+          </fieldset>
+
+          <div class="acciones flex flex-col gap-2 pt-1">
+            <button type="submit"
+              class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60">
+              <svg viewBox="0 0 24 24" class="size-4" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              Simular / Lanzar
+            </button>
+            <button type="reset"
+              class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+              <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+              Reiniciar valores
+            </button>
+          </div>
+        </form>
+
+        <div id="resultado" class="resultado mt-4 min-h-[1.25rem] rounded-lg font-mono text-xs leading-relaxed text-emerald-300" aria-live="polite"></div>
       </div>
 
-      <div id="envoltorio-puntos" class="tabla-envoltorio" hidden>
-        <table id="puntos" aria-label="Puntos de la trayectoria">
-          <caption>Puntos de la trayectoria</caption>
-          <thead>
-            <tr>
-              <th scope="col">t (s)</th>
-              <th scope="col">x (m)</th>
-              <th scope="col">y (m)</th>
-              <th scope="col">vx (m/s)</th>
-              <th scope="col">vy (m/s)</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+      <footer class="border-t border-slate-800 px-5 py-3">
+        <p class="font-mono text-[11px] text-slate-600">Simulador cliente-side &mdash; cero dependencias externas.</p>
+      </footer>
+    </aside>
+
+    <!-- ===== Área principal de simulación ===== -->
+    <main class="flex min-w-0 flex-1 flex-col lg:h-full lg:overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 px-5 py-4 lg:px-8">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-100">Panel de trayectoria</h2>
+          <p class="text-xs text-slate-500">Resultados de la última simulación</p>
+        </div>
+        <span class="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 font-mono text-[11px] text-slate-400">
+          <span class="size-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
+          g = 9.81 m/s²
+        </span>
       </div>
-    </section>
-  </main>
-  <footer>
-    <p>Simulador cliente-side &mdash; cero dependencias externas.</p>
-  </footer>
+
+      <section id="visualizacion" aria-label="Visualización del lanzamiento" class="flex flex-col gap-5 p-5 lg:p-8">
+
+        <div class="visualizacion-fila flex flex-col gap-5">
+          <!-- KPIs (app.js rellena este contenedor) -->
+          <div id="resumen" class="resumen order-first grid grid-cols-2 gap-3 xl:grid-cols-4" hidden></div>
+
+          <!-- Lienzo con cuadrícula de fondo -->
+          <div class="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60
+                      bg-[linear-gradient(to_right,rgba(148,163,184,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.07)_1px,transparent_1px)]
+                      bg-[size:32px_32px]">
+            <div id="estado-vacio" class="estado-vacio flex h-[clamp(320px,55vh,560px)] flex-col items-center justify-center gap-3 text-center">
+              <div class="flex size-12 items-center justify-center rounded-full border border-slate-700 bg-slate-900" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="size-5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20c4-10 10-14 18-15"/><path d="M3 20h18"/></svg>
+              </div>
+              <p class="text-sm text-slate-400">Complete los datos y lance</p>
+              <p class="font-mono text-[11px] text-slate-600">La trayectoria aparecerá aquí</p>
+            </div>
+
+            <canvas
+              id="trayectoria"
+              width="640"
+              height="360"
+              role="img"
+              aria-label="Trayectoria del proyectil"
+              class="block h-[clamp(320px,55vh,560px)] w-full"
+              hidden
+            ></canvas>
+          </div>
+        </div>
+
+        <!-- Tabla de puntos -->
+        <div id="envoltorio-puntos" class="tabla-envoltorio max-h-[360px] overflow-auto rounded-xl border border-slate-800 bg-slate-900/40" hidden>
+          <table id="puntos" aria-label="Puntos de la trayectoria" class="w-full border-collapse">
+            <caption class="sticky left-0 border-b border-slate-800 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Puntos de la trayectoria</caption>
+            <thead class="sticky top-0 z-10 bg-slate-900">
+              <tr class="font-mono text-[11px] uppercase tracking-wider text-slate-400">
+                <th scope="col" class="border-b border-slate-800 px-4 py-2 text-left font-medium">t (s)</th>
+                <th scope="col" class="border-b border-slate-800 px-4 py-2 text-right font-medium">x (m)</th>
+                <th scope="col" class="border-b border-slate-800 px-4 py-2 text-right font-medium">y (m)</th>
+                <th scope="col" class="border-b border-slate-800 px-4 py-2 text-right font-medium">vx (m/s)</th>
+                <th scope="col" class="border-b border-slate-800 px-4 py-2 text-right font-medium">vy (m/s)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
   <script src="app.js" defer></script>
 </body>
 </html>
